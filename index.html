@@ -420,11 +420,24 @@ function feedback(state){
 var video=$("video"),cameraBox=$("cameraBox"),scanToggle=$("scanToggle"),torchBtn=$("torchBtn"),scanMsg=$("scanMsg");
 var stream=null,track=null,detector=null,scanning=false,torchOn=false;
 var hasBD=("BarcodeDetector" in window);
+var secureCtx=(typeof window.isSecureContext==="boolean")? window.isSecureContext : (location.protocol==="https:"||location.hostname==="localhost"||location.hostname==="127.0.0.1");
+var canScan=secureCtx && hasBD;
+function scanReason(){
+  if(!secureCtx) return "Strona działa po HTTP (niezabezpieczone źródło: "+location.host+"). Przeglądarki włączają skaner i kamerę wyłącznie z HTTPS albo http://localhost — adres LAN po HTTP nie wystarczy. Wystaw plik na HTTPS lub uruchom serwer na samym telefonie i wejdź przez http://localhost. Do tego czasu wpisuj kody ręcznie poniżej.";
+  if(!hasBD) return "Ta przeglądarka nie ma BarcodeDetector. Użyj Chrome lub Edge na Androidzie, albo wpisuj kody ręcznie poniżej.";
+  return "";
+}
+function setCap(){
+  var c=$("cap");
+  if(canScan){ c.className="chip okchip"; c.textContent="skaner gotowy"; }
+  else if(!secureCtx){ c.className="chip warnchip"; c.textContent="HTTP — skaner wyłączony"; }
+  else { c.className="chip warnchip"; c.textContent="brak skanera"; }
+}
 
 function setMsg(t){ if(t){ scanMsg.textContent=t; scanMsg.classList.remove("hidden"); } else scanMsg.classList.add("hidden"); }
 async function startScan(){
   audioOn();
-  if(!hasBD){ setMsg("Ta przeglądarka nie ma wbudowanego skanera (BarcodeDetector). Otwórz w Chrome na Androidzie lub wpisuj kody ręcznie poniżej."); return; }
+  if(!canScan){ setMsg(scanReason()); return; }
   try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}}});
     track=stream.getVideoTracks()[0];
@@ -522,7 +535,7 @@ function exportAnoms(){
 function persist(){ save({columns:columns,mapInv:mapInv,mapSer:mapSer,caseIns:caseIns,fileName:fileName,devices:devices,anomalies:anomalies}); }
 function showApp(){
   viewImport.classList.add("hidden"); viewApp.classList.remove("hidden"); $("meter").classList.remove("hidden");
-  $("cap").className="chip "+(hasBD?"okchip":"warnchip"); $("cap").textContent=hasBD?"skaner gotowy":"skaner: brak — wpisuj ręcznie";
+  setCap(); setMsg(canScan? "" : scanReason());
   resetVerdict(); render();
 }
 function showImport(){
@@ -586,7 +599,7 @@ $("newImport").addEventListener("click",function(){
 window.addEventListener("pagehide",stopScan);
 
 /* ---------- init ---------- */
-$("cap").className="chip "+(hasBD?"okchip":"warnchip"); $("cap").textContent=hasBD?"skaner gotowy":"brak skanera";
+setCap();
 if(!restore()){
   showImport();
   if(!hasBD){ /* hint stays in chip */ }
